@@ -1,0 +1,5 @@
+# Ignore everything inside the data folder
+data/
+
+*.tif 
+*.csv
