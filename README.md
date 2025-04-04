@@ -17,3 +17,9 @@ The dataset utilized for this project is too large to be hosted directly in this
 1. Download the dataset from Kaggle  
 2. Extract the contents to the `data/` directory
 3. Run the desired model file from the main directory
+
+## Authors
+- Damien Liscio
+- Fan Yang
+- Sophia Ojegba
+- Harpreet Singh Dhanda
