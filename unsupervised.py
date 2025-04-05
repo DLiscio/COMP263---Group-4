@@ -1,5 +1,6 @@
 """
 COMP263 - Group 4: Evaluating Deep Neural Networks using the Histopathologic Cancer Detection dataset
+Unsupervised Learning
 """
 import pandas as pd
 import numpy as np
@@ -10,7 +11,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras
 from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Dense, Input, Reshape, Conv2DTranspose, BatchNormalization, LeakyReLU, Conv2D, Dropout, Flatten
+from tensorflow.keras.layers import Dense, Input, Reshape, Conv2DTranspose, BatchNormalization, LeakyReLU, Conv2D, Dropout, Flatten, SpatialDropout2D
 from tensorflow.keras.optimizers import Adam
 
 # Ensure directories/paths exists
@@ -92,42 +93,42 @@ plt.savefig(f"{generated_image_dir}/sample_images.png")
 plt.close(fig_one)
 
 # Batch and shuffle training data and declare model parameters
-batch_size = 128
-train = tf.data.Dataset.from_tensor_slices(image_data).shuffle(20000).batch(batch_size)
-latent_dim = 64
-epochs = 20
+batch_size = 64
+train = tf.data.Dataset.from_tensor_slices(image_data).shuffle(20000).batch(batch_size, drop_remainder=True)
+latent_dim = 128
+epochs = 50
 
 # Build the generator of GAN
 generator_model = Sequential([
     Input(shape=(latent_dim,)),
-    Dense(6*6*64, use_bias=False),
+    Dense(24*24*256, use_bias=False),
     BatchNormalization(),
     LeakyReLU(alpha=0.2),
-    Reshape((6,6,64)),
-    Conv2DTranspose(32, kernel_size=(4,4), strides=(2,2), padding="same", use_bias=False),
+    Reshape((24,24,256)),
+    Conv2DTranspose(128, kernel_size=(5,5), strides=(2,2), padding="same", use_bias=False),
     BatchNormalization(),
     LeakyReLU(alpha=0.2),
-    Conv2DTranspose(16, kernel_size=(4,4), strides=(4,4), padding="same", use_bias=False),
+    Conv2DTranspose(64, kernel_size=(5,5), strides=(2,2), padding="same", use_bias=False),
     BatchNormalization(),
     LeakyReLU(alpha=0.2),
-    Conv2DTranspose(1, kernel_size=(4,4), strides=(2,2), padding="same", activation="tanh", use_bias=True)
+    Conv2DTranspose(32, kernel_size=(3,3), strides=(1,1), padding="same", use_bias=False),
+    BatchNormalization(),
+    LeakyReLU(alpha=0.2),
+    Conv2DTranspose(1, kernel_size=(3,3), strides=(1,1), padding="same", activation="tanh", use_bias=True)
 ])
 
 # Build the discriminator
 discriminator_model = Sequential([
     Input(shape=(96,96,1)),
-    Conv2D(16, kernel_size=(4,4), strides=(2,2), padding="same"),
+    Conv2D(64, kernel_size=(5,5), strides=(2,2), padding="same"),
     LeakyReLU(alpha=0.2),
-    Dropout(0.3),
-    Conv2D(32, kernel_size=(4,4), strides=(4,4), padding="same"),
+    SpatialDropout2D(0.3),
+    Conv2D(128, kernel_size=(5,5), strides=(2,2), padding="same"),
     LeakyReLU(alpha=0.2),
-    Dropout(0.3),
-    Conv2D(64, kernel_size=(4,4), strides=(2,2), padding="same"),
+    SpatialDropout2D(0.3),
+    Conv2D(128, kernel_size=(3,3), strides=(2,2), padding="same"),
     LeakyReLU(alpha=0.2),
-    Dropout(0.3),
     Flatten(),
-    Dense(64, activation='relu'),  
-    Dropout(0.25),
     Dense(1, activation="sigmoid")
 ])
 
@@ -135,11 +136,11 @@ discriminator_model = Sequential([
 loss = keras.losses.BinaryCrossentropy(from_logits=False)
 
 # Create the optimizers
-initial_lr = 0.00001
+initial_lr = 0.0002
 lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
     initial_lr,
-    decay_steps=100,  
-    decay_rate=0.99
+    decay_steps=300,  
+    decay_rate=0.95
 )
 generator_optimizer = Adam(learning_rate=lr_schedule, beta_1=0.5)
 discriminator_optimizer = Adam(learning_rate=lr_schedule, beta_1=0.5)
@@ -194,14 +195,35 @@ with open(results_file, 'w', encoding='utf-8' ) as f:
 # Define training function
 @tf.function
 def training_step(images):
+    noise_factor = 0.005
+    image_noise = tf.random.normal(shape=tf.shape(images), mean=0.0, stddev=noise_factor)
+    noisy_images = images + image_noise
+
+    # Random flipping for data augmentation
+    noisy_images = tf.image.random_flip_left_right(noisy_images)
+    noisy_images = tf.image.random_flip_up_down(noisy_images)
+
     noise = tf.random.normal([batch_size, latent_dim])
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         generated_images = generator_model(noise, training=True)
-        real_output = discriminator_model(images, training=True)
-        fake_output = discriminator_model(generated_images, training=True)
-        gen_loss = loss(tf.ones_like(fake_output), fake_output)
-        real_loss = loss(tf.ones_like(real_output), real_output)
-        fake_loss = loss(tf.zeros_like(fake_output), fake_output)
+
+        # Add noise to generated images 
+        gen_noise = tf.random.normal(shape=tf.shape(generated_images), mean=0.0, stddev=noise_factor)
+        noisy_generated = generated_images + gen_noise
+        
+        real_output = discriminator_model(noisy_images, training=True)
+        fake_output = discriminator_model(noisy_generated, training=True)
+        
+        # Label smoothing
+        real_labels = tf.ones_like(real_output) * 0.95 
+        fake_labels = tf.zeros_like(fake_output) + 0.05
+
+        # Wasserstein-inspired loss for generator
+        gen_loss = -tf.reduce_mean(fake_output)
+        
+        # Regular discriminator loss with label smoothing
+        real_loss = loss(real_labels, real_output)
+        fake_loss = loss(fake_labels, fake_output)
         disc_loss = real_loss + fake_loss
 
     gradients_of_generator = gen_tape.gradient(gen_loss, generator_model.trainable_variables)
@@ -251,7 +273,7 @@ def train_models(dataset):
             f.write(f"{epoch+1}, {epoch_time:.2f}, {avg_gen_loss:.4f}, {avg_disc_loss:.4f}\n")
 
             # Generate and save sample image every 10 epochs, including first epoch
-            if (epoch + 1) % 5 == 0 or epoch == 0:
+            if (epoch + 1) % 10 == 0 or epoch == 0:
                 noise = tf.random.normal([1, latent_dim])
                 generated_img = generator_model(noise, training=False)
                 generated_img = 0.5 * generated_img + 0.5
@@ -289,7 +311,8 @@ generated_images = ((generated_images / 127.5) + 127.5)
 fig = plt.figure(figsize=(8,8))
 for i in range(12):
     # Save image for future testing with supervised model
-    img = generated_images[i,:,:,0]
+    img = generated_images[i,:,:,0].numpy() 
+    img = (img * 255).astype(np.uint8)
     cv2.imwrite(f"results/unsupervised/generated_test_data/generated_sample_{i+1}.tif", img)
 
     plt.subplot(4,3, i+1)

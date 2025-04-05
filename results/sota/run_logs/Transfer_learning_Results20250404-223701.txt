@@ -1,0 +1,12 @@
+EfficientNet Model Training Results
+================================
+
+From Scratch Model Results:
+Loss: 0.7604
+Accuracy: 0.5000
+AUC: 0.5569
+
+Transfer Learning Model Results:
+Loss: 0.7290
+Accuracy: 0.5270
+AUC: 0.5860
