@@ -16,7 +16,7 @@ The dataset utilized for this project is too large to be hosted directly in this
 
 1. Download the dataset from Kaggle  
 2. Extract the contents to the `data/` directory
-3. To run the files locally, execute the following commands from the `COMP263 - Group 4/` directory:
+3. To run the files locally, execute the following commands from the `COMP263---Group-4-main/` directory:
   - **Supervised**:
   ```python
   python supervised.py
