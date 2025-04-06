@@ -114,13 +114,12 @@ X_test = np.repeat(X_test, 3, axis=-1)
 
 # Augment Data
 augment_data = tf.keras.Sequential([
-    RandomRotation(0.2),
+    RandomRotation(0.15),
     RandomFlip("horizontal"),
     RandomFlip("vertical"),
     RandomTranslation(0.1, 0.1),  
-    RandomContrast(0.2),
-    RandomZoom(0.2),
-    tf.keras.layers.GaussianNoise(0.1)
+    RandomContrast(0.1),
+    RandomZoom(0.15)
 ])
 
 # Create tf datasets
@@ -143,14 +142,15 @@ def create_model(transfer_learning=True):
         # Initialize untrained model if transfer_learning is false
         base_model = base_model = EfficientNetB0(weights=None, include_top=False, input_shape=(96,96,3))
     
+    # Model Arcitecture
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
     x = Dense(1024, activation='relu')(x)
-    x = BatchNormalization()(x)  
-    x = Dropout(0.3)(x)
+    x = BatchNormalization()(x)
+    x = Dropout(0.4)(x)  
     x = Dense(512, activation='relu')(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)  #
+    x = Dropout(0.4)(x)  
     x = Dense(256, activation='relu')(x)
     x = BatchNormalization()(x)  
     x = Dropout(0.3)(x)  
@@ -161,13 +161,13 @@ def create_model(transfer_learning=True):
 
 # Callback for early stopping
 callback = [
-    EarlyStopping(monitor='val_accuracy', patience=10, restore_best_weights=True)
+    EarlyStopping(monitor='val_accuracy', patience=15, restore_best_weights=True)
 ]
 
 # Training parameters
 epochs = 25
-initial_lr = 0.001
-fine_tuning_lr = 0.0001
+initial_lr = 0.0001
+fine_tuning_lr = 0.00001
 
 # Train model from scratch
 print("\nTraining EfficientNet Model from Scratch... ")
@@ -184,7 +184,7 @@ transfer_model.compile(optimizer=Adam(learning_rate=initial_lr), loss='binary_cr
 transfer_model_history = transfer_model.fit(train, validation_data=val, epochs=epochs, callbacks=callback)
 
 base_model.trainable = True
-layer_count = int(len(base_model.layers) * 0.7)
+layer_count = int(len(base_model.layers) * 0.85)
 for layer in base_model.layers[:layer_count]:
     layer.trainable = False
 transfer_model.compile(optimizer=Adam(learning_rate=fine_tuning_lr), loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC(name='auc')])

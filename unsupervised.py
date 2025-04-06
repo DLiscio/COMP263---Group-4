@@ -214,17 +214,13 @@ def training_step(images):
         real_output = discriminator_model(noisy_images, training=True)
         fake_output = discriminator_model(noisy_generated, training=True)
         
-        # Label smoothing
-        real_labels = tf.ones_like(real_output) * 0.95 
-        fake_labels = tf.zeros_like(fake_output) + 0.05
+        # Label Smoothing
+        real_labels = tf.random.uniform([batch_size, 1], 0.8, 0.9)
+        fake_labels = tf.random.uniform([batch_size, 1], 0.0, 0.1)
 
-        # Wasserstein-inspired loss for generator
-        gen_loss = -tf.reduce_mean(fake_output)
-        
-        # Regular discriminator loss with label smoothing
-        real_loss = loss(real_labels, real_output)
-        fake_loss = loss(fake_labels, fake_output)
-        disc_loss = real_loss + fake_loss
+        # Loss
+        gen_loss = loss(real_labels, fake_output)  
+        disc_loss = loss(real_labels, real_output) + loss(fake_labels, fake_output)
 
     gradients_of_generator = gen_tape.gradient(gen_loss, generator_model.trainable_variables)
     gradients_of_discriminator = disc_tape.gradient(disc_loss, discriminator_model.trainable_variables)
