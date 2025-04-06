@@ -6,16 +6,16 @@ The purpose of this project is to gain practical hands on experience by applying
 
 ## Dataset
 
-The dataset used for this project was the Kaggle Histopathologic Cancer Detection dataset, which contains magnified partial images of larger pathology scans, containing both images of those with cancer and those without. 
+The dataset used for this project was the Kaggle Histopathologic Cancer Detection dataset, which contains magnified partial images of larger pathology scans, containing both images of those with cancer and those without, used for a Kaggle machine learning contest. The dataset contains two directories with images, one for training and one for testing, a .csv file with labels for the training images, and a .csv file with a sample submission for the contest.
 
-The dataset utilized for this project is too large to be hosted directly in this repository. You can download the dataset from Kaggle using the link below, extract the contents and add them to the data directory:
+The dataset utilized for this project is too large to be hosted directly in this repository. You can download the dataset using the link below by signing into Kaggle and accepting the contest terms:
 
 - **[Download the Histopathologic Cancer Detection dataset here](https://www.kaggle.com/c/histopathologic-cancer-detection/data)**
 
 ### **Setup Instructions**  
 
 1. Download the dataset from Kaggle  
-2. Extract the contents to the `data/` directory
+2. Extract the contents to the `data/` directory. discarding of the `sample_submission.csv` and keeping `train/`, `test/`, and `test_labels.csv`.
 3. To run the files locally, execute the following commands from the `COMP263---Group-4-main/` directory:
   - **Supervised**:
   ```python
