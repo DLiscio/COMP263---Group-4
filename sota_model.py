@@ -16,6 +16,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, BatchNormalization, Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.regularizers import l2
 
 # Ensure directories/paths exists
 image_dir = 'data/train/'
@@ -145,14 +146,14 @@ def create_model(transfer_learning=True):
     # Model Arcitecture
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
-    x = Dense(1024, activation='relu')(x)
-    x = BatchNormalization()(x)
+    x = Dense(1024, activation='relu', kernel_regularizer=l2(0.01))(x)
+    x = BatchNormalization(momentum=0.9)(x)
     x = Dropout(0.4)(x)  
-    x = Dense(512, activation='relu')(x)
-    x = BatchNormalization()(x)
+    x = Dense(512, activation='relu', kernel_regularizer=l2(0.01))(x)
+    x = BatchNormalization(momentum=0.9)(x)
     x = Dropout(0.4)(x)  
-    x = Dense(256, activation='relu')(x)
-    x = BatchNormalization()(x)  
+    x = Dense(256, activation='relu', kernel_regularizer=l2(0.01))(x)
+    x = BatchNormalization(momentum=0.9)(x)  
     x = Dropout(0.3)(x)  
     outputs = Dense(1, activation='sigmoid')(x)
 
@@ -161,7 +162,24 @@ def create_model(transfer_learning=True):
 
 # Callback for early stopping
 callback = [
-    EarlyStopping(monitor='val_accuracy', patience=15, restore_best_weights=True)
+    EarlyStopping(
+        monitor='val_loss',
+        patience=15,
+        restore_best_weights=True,
+        min_delta=0.001
+    ),
+    EarlyStopping(
+        monitor='val_accuracy',
+        patience=15,
+        restore_best_weights=True,
+        min_delta=0.001
+    ),
+    tf.keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss',
+        factor=0.5,
+        patience=5,
+        min_lr=1e-6
+    )
 ]
 
 # Training parameters
@@ -172,14 +190,14 @@ fine_tuning_lr = 0.00001
 # Train model from scratch
 print("\nTraining EfficientNet Model from Scratch... ")
 model, _ = create_model(transfer_learning=False)
-model.compile(optimizer=Adam(learning_rate=initial_lr), loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC(name='auc')])
+model.compile(optimizer=Adam(learning_rate=initial_lr, clipnorm=1.0), loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC(name='auc')])
 
 model_history = model.fit(train, validation_data=val, epochs=epochs, callbacks=callback)
 
 # Train model with transfer learning
 print("\nTraining EfficientNet with Transfer Learning 1st Stage...")
 transfer_model, base_model = create_model(transfer_learning=True)
-transfer_model.compile(optimizer=Adam(learning_rate=initial_lr), loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC(name='auc')])
+transfer_model.compile(optimizer=Adam(learning_rate=initial_lr, clipnorm=1.0), loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC(name='auc')])
 
 transfer_model_history = transfer_model.fit(train, validation_data=val, epochs=epochs, callbacks=callback)
 
@@ -187,7 +205,7 @@ base_model.trainable = True
 layer_count = int(len(base_model.layers) * 0.85)
 for layer in base_model.layers[:layer_count]:
     layer.trainable = False
-transfer_model.compile(optimizer=Adam(learning_rate=fine_tuning_lr), loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC(name='auc')])
+transfer_model.compile(optimizer=Adam(learning_rate=fine_tuning_lr, clipnorm=1.0), loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC(name='auc')])
 
 transfer_model_history_2 = transfer_model.fit(train, validation_data=val, epochs=30, callbacks=callback)
 

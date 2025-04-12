@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>COMP263 Deep Learning - Group 4</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}"/>
+    </head>
+    <body>
+        <header>
+            <h1>Deep Learning Models With The Histopathologic Cancer Dataset</h1>
+            <nav>
+                <ul>
+                    <li>|| Damien Liscio  ||</li>
+                    <li>Fan Yang ||</li>
+                    <li>Sophia Ojegba ||</li>
+                    <li>Harpreet Singh Dhanda  ||</li>
+                </ul>
+            </nav>
+        </header>
+
+        <main>
+            <p class="intro-text">
+                The purpose of this project was to gain practical hands-on experience by applying learned knowledge in Deep Learning concepts to a real-world project.
+                We will utilized three different learning techniques: supervised, unsupervised, and transfered to conduct extensive experimentation on the dataset to develop capable models.
+                To learn more, please select one of the models below:
+            </p>
+            <div class="main-buttons">
+                <a href="{{ url_for('supervisedModel') }}">Supervised Model</a>
+                <a href="{{ url_for('unsupervisedModel') }}">Unsupervised Model</a>
+                <a href="{{ url_for('sotaModel') }}">State of the Art Model</a>
+            </div>
+        </main>
+        <footer>
+            <p>&copy; 2025 COMP263 - Group 4. All Rights Reserved.</p>
+        </footer>
+    </body>
+</html>
