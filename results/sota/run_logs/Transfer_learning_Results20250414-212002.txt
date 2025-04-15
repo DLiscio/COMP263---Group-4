@@ -1,5 +1,5 @@
 MobileNetV2 Transfer Learning Test Results
 ================================
 
-Test Loss: 0.4476
-Test Accuracy: 0.7920
+Test Loss: 0.4004
+Test Accuracy: 0.8167

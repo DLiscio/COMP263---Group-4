@@ -44,17 +44,14 @@
                     fetch('/state-of-the-art-predictions')
                         .then(response => response.json())
                         .then(data => {
-                            // Update image
                             document.getElementById('sotaImage').src = 'data:image/png;base64,' + data.image;
                             
-                            // Update labels
                             document.getElementById('actualLabel').innerText = data.actual_label;
                             document.getElementById('actualLabelText').innerText = getLabelText(data.actual_label);
                             
                             document.getElementById('predictedLabel').innerText = data.predicted_label;
                             document.getElementById('predictedLabelText').innerText = getLabelText(data.predicted_label);
                             
-                            // Show accuracy
                             const isCorrect = data.actual_label === data.predicted_label;
                             document.getElementById('accuracy').innerHTML = 
                                 `<strong>Prediction ${isCorrect ? 'Correct' : 'Incorrect'}</strong>`;

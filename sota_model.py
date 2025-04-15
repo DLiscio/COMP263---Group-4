@@ -10,13 +10,12 @@ import time
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
-from tensorflow.keras.layers import RandomRotation, RandomFlip, RandomZoom, RandomTranslation, RandomContrast
+from tensorflow.keras.layers import RandomRotation, RandomFlip, RandomZoom
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, BatchNormalization, Dropout
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.regularizers import l2
 
 tf.config.set_soft_device_placement(True)
 physical_devices = tf.config.list_physical_devices('GPU')
@@ -172,8 +171,8 @@ def create_model():
 
 # Callback for early stopping
 callbacks = [
-    EarlyStopping(monitor='val_accuracy', patience=2, restore_best_weights=True),
-    ReduceLROnPlateau(monitor='val_accuracy', factor=0.5, patience=3, min_lr=1e-6)
+    EarlyStopping(monitor='val_accuracy', patience=8, restore_best_weights=True),
+    ReduceLROnPlateau(monitor='val_accuracy', factor=0.5, patience=3, min_lr=0.01)
 ]
 
 # Training parameters

@@ -19,7 +19,10 @@ from supervised import CNNModel
 app = Flask(__name__)
 
 # Load trained models
+# GAN
 generator_model = load_model(os.path.join(project_root, "results/unsupervised/model/generator_model.h5"))
+
+# Supervised Model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 supervised_model_path = os.path.join(project_root, "results/supervised/best_model.pth")
 supervised_model = CNNModel(filters=(32, 64, 128))
@@ -30,6 +33,8 @@ transform = transforms.Compose([
     transforms.Resize((64, 64)),
     transforms.ToTensor(),
 ])
+
+# State-of-the-art model
 model_path = 'results/sota/model/final_transfer_model.h5'
 sota_model = load_model(os.path.join(project_root, model_path))
 
@@ -71,6 +76,7 @@ def preprocess_sota_image(img):
     img = np.repeat(img, 3, axis=-1)
     return img.astype('float32')
 
+# API Endpoints
 @app.route("/")
 def homepage():
     return render_template('home.html')
