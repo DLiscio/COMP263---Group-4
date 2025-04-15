@@ -12,7 +12,7 @@ The dataset utilized for this project is too large to be hosted directly in this
 
 - **[Download the Histopathologic Cancer Detection dataset here](https://www.kaggle.com/c/histopathologic-cancer-detection/data)**
 
-### **Setup Instructions**  
+### **Model Training Instructions**  
 
 1. Download the dataset from Kaggle  
 2. Extract the contents to the `data/` directory. discarding of the `sample_submission.csv` and keeping `train/`, `test/`, and `test_labels.csv`.
@@ -28,6 +28,15 @@ The dataset utilized for this project is too large to be hosted directly in this
   - **State of the Art**:
   ```python
   python sota_model.py
+  ```
+
+## Web Application
+
+The web application features visual implementations of all 3 learning types and offers the ability to see the trained models abilities. The supervised & state-of-the-art pages allow you to randomly select an image from the dataset, and uses the model to predict the images class and displays the prediction along with the actual class label. The unsupervised page allows the user to generate an image using the model, and then displays the generated image next to an actual image from the dataset for comparison. The web application is built using Flask and features an app.py containing page & model functionality endpoints.
+
+To start the server, execute the following command from the `COMP263---Group-4-main/` directory:
+  ```python
+  python frontend/app.py
   ```
 
 ## Authors
