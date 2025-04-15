@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras
 from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Dense, Input, Reshape, Conv2DTranspose, BatchNormalization, LeakyReLU, Conv2D, Dropout, Flatten, SpatialDropout2D
+from tensorflow.keras.layers import Dense, Input, Reshape, Conv2DTranspose, BatchNormalization, LeakyReLU, Conv2D, Flatten, SpatialDropout2D
 from tensorflow.keras.optimizers import Adam
 
 # Ensure directories/paths exists
@@ -294,6 +294,9 @@ def train_models(dataset):
 # Train the models
 train_models(train)
 
+# Save the model
+generator_model.save("results/unsupervised/model/generator_model.h5")
+
 # Create 12 sample vectors 
 trained_sample_vectors = tf.random.normal([12, latent_dim])
 
@@ -301,7 +304,7 @@ trained_sample_vectors = tf.random.normal([12, latent_dim])
 generated_images = generator_model(trained_sample_vectors, training=False)
 
 # Normalize pixel values
-generated_images = ((generated_images / 127.5) + 127.5)
+generated_images = ((generated_images + 1) + 127.5)
 
 # Plot and save the generated images
 fig = plt.figure(figsize=(8,8))

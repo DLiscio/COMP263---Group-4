@@ -19,7 +19,31 @@
         </header>
 
         <main>
-            <!-- Add Content Here -->
+            <div class="image-section">
+                <h1>GAN Generated Image vs Dataset Image Comparison</h1>
+                <div class="image-row">
+                    <div>
+                        <h3>Generated Image</h3>
+                        <img id="generatedImage" src="" width="300" />
+                    </div>
+                    <div>
+                        <h3>Real Image</h3>
+                        <img id="realImage" src="" width="300" />
+                    </div>
+                </div>
+                <button onclick="generateImages()">Generate Image</button>
+            </div>
+
+            <script>
+                function generateImages() {
+                    fetch('/generate')
+                        .then(response => response.json())
+                        .then(data => {
+                            document.getElementById('generatedImage').src = 'data:image/png;base64,' + data.fake;
+                            document.getElementById('realImage').src = 'data:image/png;base64,' + data.real;
+                        });
+                }
+            </script>
         </main>
         <footer>
             <p>&copy; 2025 COMP263 - Group 4. All Rights Reserved.</p>

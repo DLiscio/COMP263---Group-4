@@ -19,8 +19,56 @@
         </header>
 
         <main>
-            <!-- Add Content Here -->
+            <div class="image-section">
+                <h1>MobileNetV2 Transfer Learning Model Predictions</h1>
+                <div class="image-row">
+                    <div>
+                        <h3>Test Image</h3>
+                        <img id="sotaImage" src="" alt="Test image" width="300" />
+                        <p><strong>Actual Label:</strong> <span id="actualLabel">-</span> 
+                           (<span id="actualLabelText">-</span>)</p>
+                        <p><strong>Predicted Label:</strong> <span id="predictedLabel">-</span>
+                           (<span id="predictedLabelText">-</span>)</p>
+                        <p id="accuracy"></p>
+                    </div>
+                </div>
+                <button onclick="evaluateSotaModel()">Evaluate Model</button>
+            </div>
+
+            <script>
+                function getLabelText(label) {
+                    return label === 1 ? "Malignant" : "Benign";
+                }
+
+                function evaluateSotaModel() {
+                    fetch('/state-of-the-art-predictions')
+                        .then(response => response.json())
+                        .then(data => {
+                            // Update image
+                            document.getElementById('sotaImage').src = 'data:image/png;base64,' + data.image;
+                            
+                            // Update labels
+                            document.getElementById('actualLabel').innerText = data.actual_label;
+                            document.getElementById('actualLabelText').innerText = getLabelText(data.actual_label);
+                            
+                            document.getElementById('predictedLabel').innerText = data.predicted_label;
+                            document.getElementById('predictedLabelText').innerText = getLabelText(data.predicted_label);
+                            
+                            // Show accuracy
+                            const isCorrect = data.actual_label === data.predicted_label;
+                            document.getElementById('accuracy').innerHTML = 
+                                `<strong>Prediction ${isCorrect ? 'Correct' : 'Incorrect'}</strong>`;
+                            document.getElementById('accuracy').style.color = 
+                                isCorrect ? 'green' : 'red';
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Error fetching prediction. Please try again.');
+                        });
+                }
+            </script>
         </main>
+
         <footer>
             <p>&copy; 2025 COMP263 - Group 4. All Rights Reserved.</p>
         </footer>

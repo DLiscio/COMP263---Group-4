@@ -105,3 +105,38 @@ body {
     color: #0056b3;
   }
   
+  .image-section {
+    text-align: center;
+    margin: 40px auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .image-row {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-bottom: 20px;
+  }
+  
+  .image-row div {
+    text-align: center;
+  }
+  
+  .image-section button {
+    padding: 20px 30px;
+    background-color: #34495E;
+    color: white;
+    border: 2px solid #2C3E50;
+    border-radius: 10px;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+  
+  .image-section button:hover {
+    background-color: #1A252F;
+    transform: scale(1.05);
+  }
+  

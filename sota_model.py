@@ -11,12 +11,28 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras.layers import RandomRotation, RandomFlip, RandomZoom, RandomTranslation, RandomContrast
-from tensorflow.keras.applications import EfficientNetB0
+from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, BatchNormalization, Dropout
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.regularizers import l2
+
+tf.config.set_soft_device_placement(True)
+physical_devices = tf.config.list_physical_devices('GPU')
+if not physical_devices:
+    print("No GPU found. Using CPU with optimized settings...")
+    tf.config.threading.set_inter_op_parallelism_threads(2)
+    tf.config.threading.set_intra_op_parallelism_threads(2)
+
+# Preprocessing function
+def preprocess_image(img):
+    # Resize to 128x128 for MobileNetV2
+    img = cv2.resize(img, (128, 128))
+    # Apply CLAHE for better contrast
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    img = clahe.apply(img)
+    return img
 
 # Ensure directories/paths exists
 image_dir = 'data/train/'
@@ -67,12 +83,24 @@ else:
     labels_df_reduced = pd.read_csv("data/reduced_train_labels.csv")
 
 # Load the reduced image data
+def load_images_batch(image_paths, batch_size=1000):
+    for i in range(0, len(image_paths), batch_size):
+        batch_paths = image_paths[i:i + batch_size]
+        batch_images = []
+        for path in batch_paths:
+            img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+            if img is not None:
+                img = preprocess_image(img)
+                batch_images.append(img)
+        yield np.array(batch_images)
+
+# Load and process images
+image_paths = [os.path.join(reduced_image_dir, f"{row['id']}.tif") 
+               for _, row in labels_df_reduced.iterrows()]
 image_data = []
-for idx, row in labels_df_reduced.iterrows():
-    image_path = os.path.join(reduced_image_dir, f"{row['id']}.tif")
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    image_data.append(img)
-image_data = np.array(image_data)
+for batch in load_images_batch(image_paths):
+    image_data.append(batch)
+image_data = np.concatenate(image_data)
 
 # Explore dataset
 print("Image Labels .head(): \n", labels_df_reduced.head())
@@ -80,11 +108,9 @@ print("\nClass Distribution: \n", labels_df_reduced['label'].value_counts())
 print("\nImage Dataset Size: ", len(labels_df_reduced))
 print("\nImage Data Shape: ", image_data[0].shape)
 
-# Normalize pixel values
-image_data = (image_data / 127.5) - 1
-
-# Reshape data
-image_data = image_data.reshape(-1, 96, 96, 1).astype('float32')
+# Normalize pixel values and reshape
+image_data = (image_data - np.mean(image_data)) / np.std(image_data)
+image_data = image_data.reshape(-1, 128, 128, 1).astype('float32')
 
 # Visualize 12 images from dataset
 fig_one = plt.figure(figsize=(8,8))
@@ -115,152 +141,89 @@ X_test = np.repeat(X_test, 3, axis=-1)
 
 # Augment Data
 augment_data = tf.keras.Sequential([
-    RandomRotation(0.15),
+    RandomRotation(0.1),
     RandomFlip("horizontal"),
-    RandomFlip("vertical"),
-    RandomTranslation(0.1, 0.1),  
-    RandomContrast(0.1),
-    RandomZoom(0.15)
+    RandomZoom(0.1)
 ])
 
 # Create tf datasets
 batch_size = 32
 
-train = tf.data.Dataset.from_tensor_slices((X_train, y_train)).shuffle(14450).batch(batch_size)
-val = tf.data.Dataset.from_tensor_slices((X_val, y_val)).batch(batch_size)
-test = tf.data.Dataset.from_tensor_slices((X_test, y_test)).batch(batch_size)
+train = tf.data.Dataset.from_tensor_slices((X_train, y_train)).shuffle(1000).batch(batch_size)
+train = train.map(lambda x, y: (augment_data(x, training=True), y), num_parallel_calls=2)
+train = train.prefetch(1)
 
-# Augment trainiing data
-train = train.map(lambda x, y: (augment_data(x, training=True), y), num_parallel_calls=tf.data.AUTOTUNE)
+val = tf.data.Dataset.from_tensor_slices((X_val, y_val)).batch(batch_size).prefetch(1)
+test = tf.data.Dataset.from_tensor_slices((X_test, y_test)).batch(batch_size).prefetch(1)
 
 # Function to handle model creation
-def create_model(transfer_learning=True):
-    if transfer_learning:
-        # Initialize pretrained model if transfer_learning is true
-        base_model = EfficientNetB0(weights='imagenet', include_top=False, input_shape=(96,96,3))
-        base_model.trainable = False
-    else:
-        # Initialize untrained model if transfer_learning is false
-        base_model = base_model = EfficientNetB0(weights=None, include_top=False, input_shape=(96,96,3))
+def create_model():
+    base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(128,128,3))
+    base_model.trainable = False
     
     # Model Arcitecture
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
-    x = Dense(1024, activation='relu', kernel_regularizer=l2(0.01))(x)
-    x = BatchNormalization(momentum=0.9)(x)
-    x = Dropout(0.4)(x)  
-    x = Dense(512, activation='relu', kernel_regularizer=l2(0.01))(x)
-    x = BatchNormalization(momentum=0.9)(x)
-    x = Dropout(0.4)(x)  
-    x = Dense(256, activation='relu', kernel_regularizer=l2(0.01))(x)
-    x = BatchNormalization(momentum=0.9)(x)  
-    x = Dropout(0.3)(x)  
+    x = Dense(64, activation='relu')(x)
+    x = Dropout(0.3)(x)
     outputs = Dense(1, activation='sigmoid')(x)
 
-    model = Model(inputs=base_model.input, outputs=outputs)
-    return model, base_model
+    return Model(inputs=base_model.input, outputs=outputs)
 
 # Callback for early stopping
-callback = [
-    EarlyStopping(
-        monitor='val_loss',
-        patience=15,
-        restore_best_weights=True,
-        min_delta=0.001
-    ),
-    EarlyStopping(
-        monitor='val_accuracy',
-        patience=15,
-        restore_best_weights=True,
-        min_delta=0.001
-    ),
-    tf.keras.callbacks.ReduceLROnPlateau(
-        monitor='val_loss',
-        factor=0.5,
-        patience=5,
-        min_lr=1e-6
-    )
+callbacks = [
+    EarlyStopping(monitor='val_accuracy', patience=2, restore_best_weights=True),
+    ReduceLROnPlateau(monitor='val_accuracy', factor=0.5, patience=3, min_lr=1e-6)
 ]
 
 # Training parameters
-epochs = 25
-initial_lr = 0.0001
-fine_tuning_lr = 0.00001
-
-# Train model from scratch
-print("\nTraining EfficientNet Model from Scratch... ")
-model, _ = create_model(transfer_learning=False)
-model.compile(optimizer=Adam(learning_rate=initial_lr, clipnorm=1.0), loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC(name='auc')])
-
-model_history = model.fit(train, validation_data=val, epochs=epochs, callbacks=callback)
+epochs = 10
+initial_lr = 0.001
 
 # Train model with transfer learning
-print("\nTraining EfficientNet with Transfer Learning 1st Stage...")
-transfer_model, base_model = create_model(transfer_learning=True)
-transfer_model.compile(optimizer=Adam(learning_rate=initial_lr, clipnorm=1.0), loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC(name='auc')])
+print("\nTraining MobileNetV2 with Transfer Learning 1st Stage...")
+transfer_model = create_model()
+transfer_model.compile(optimizer=Adam(learning_rate=initial_lr), loss='binary_crossentropy', metrics=['accuracy'])
 
-transfer_model_history = transfer_model.fit(train, validation_data=val, epochs=epochs, callbacks=callback)
+transfer_model_history = transfer_model.fit(train, validation_data=val, epochs=epochs, callbacks=callbacks, verbose=1)
 
-base_model.trainable = True
-layer_count = int(len(base_model.layers) * 0.85)
-for layer in base_model.layers[:layer_count]:
-    layer.trainable = False
-transfer_model.compile(optimizer=Adam(learning_rate=fine_tuning_lr, clipnorm=1.0), loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC(name='auc')])
-
-transfer_model_history_2 = transfer_model.fit(train, validation_data=val, epochs=30, callbacks=callback)
-
-# Evaluate both models
-print("Evaluating Models on Test Set...")
-model_results = model.evaluate(test, verbose=1)
+# Evaluate model
+print("Evaluating Model on Test Set...")
 transfer_model_results = transfer_model.evaluate(test, verbose=1)
 
-# Print test results
-print("\nUntrained Model Test Results:")
-print(f"Loss: {model_results[0]:.4f}")
-print(f"Accuracy: {model_results[1]:.4f}")
-print(f"AUC: {model_results[2]:.4f}")
+# Save Transfer learning model
+transfer_model.save('results/sota/model/final_transfer_model.h5')
 
+# Print test results
 print("\nTransfer Learning Model Test Results:")
 print(f"Loss: {transfer_model_results[0]:.4f}")
 print(f"Accuracy: {transfer_model_results[1]:.4f}")
-print(f"AUC: {transfer_model_results[2]:.4f}")
 
-# Function to plot model history
-def plot_history(metric):
-    plt.figure(figsize=(12,6))
+# {lot model history
+plt.figure(figsize=(12,4))
+plt.subplot(1,2,1)
+plt.plot(transfer_model_history.history['accuracy'], label='Training')
+plt.plot(transfer_model_history.history['val_accuracy'], label='Validation')
+plt.title('Model Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
 
-    # Untrained model
-    plt.plot(model_history.history[metric], label='Untrained Model (training)')
-    plt.plot(model_history.history[f'val_{metric}'], label='Untrained Model (validation)')
+plt.subplot(1,2,2)
+plt.plot(transfer_model_history.history['loss'], label='Training')
+plt.plot(transfer_model_history.history['val_loss'], label='Validation')
+plt.title('Model Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
 
-    #Transfer Learning
-    transfer_train_metric = transfer_model_history.history[metric] + transfer_model_history_2.history[metric]
-    transfer_val_metric = transfer_model_history.history[f'val_{metric}'] + transfer_model_history_2.history[f'val_{metric}']
-    plt.plot(transfer_train_metric, label='Transfer Learning Model (training)')
-    plt.plot(transfer_val_metric, label='Transfer Learning Model (validation)')
-
-    plt.title(f'Model {metric}')
-    plt.xlabel('Epoch')
-    plt.ylabel(metric.capitalize())
-    plt.legend()
-    plt.savefig(f'{generated_image_dir}/{metric}_comparison.png')
-    plt.close()
-
-# Plot accuracy and loss
-plot_history('accuracy')
-plot_history('loss')
+plt.tight_layout()
+plt.savefig(f'{generated_image_dir}/training_history.png')
+plt.close()
 
 # Save training history and results to file
 with open(results_file, 'w') as f:
-    f.write("EfficientNet Model Training Results\n")
+    f.write("MobileNetV2 Transfer Learning Test Results\n")
     f.write("================================\n\n")
-    
-    f.write("From Scratch Model Results:\n")
-    f.write(f"Loss: {model_results[0]:.4f}\n")
-    f.write(f"Accuracy: {model_results[1]:.4f}\n")
-    f.write(f"AUC: {model_results[2]:.4f}\n\n")
-    
-    f.write("Transfer Learning Model Results:\n")
-    f.write(f"Loss: {transfer_model_results[0]:.4f}\n")
-    f.write(f"Accuracy: {transfer_model_results[1]:.4f}\n")
-    f.write(f"AUC: {transfer_model_results[2]:.4f}\n")
+    f.write(f"Test Loss: {transfer_model_results[0]:.4f}\n")
+    f.write(f"Test Accuracy: {transfer_model_results[1]:.4f}\n")
